@@ -66,9 +66,22 @@ class Student:
             self.cursor.execute("INSERT INTO students (student_id, name, gender, year_level, course_code, course_name) VALUES (%s, %s, %s, %s, %s, %s)",
                                 (student_id, name, gender, year_level, course_code, course_name))
             self.db.commit()
-            print("Course name updated successfully.")
         else:
             print("Invalid course code. Student not added.")
+        self.save_to_db()
+
+        # Disconnect from the database
+        self.cursor.close()
+        self.db.close()
+
+        # Reconnect to the database
+        self.db = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="nawawi",
+            database="ssis_db"
+        )
+        self.cursor = self.db.cursor()
 
     def get_course_name(self, course_code):
         self.cursor.execute("SELECT course_name FROM courses WHERE course_code = %s", (course_code,))
@@ -143,20 +156,19 @@ class Student:
         print("Student not found.")
 
     def display_list(self):
-        if not self.students:
+        self.cursor.execute("SELECT students.student_id, students.name, students.gender, students.year_level, students.course_code, courses.course_name FROM students LEFT JOIN courses ON students.course_code = courses.course_code")
+        students = self.cursor.fetchall()
+        if not students:
             print("No students found.")
-        else:
-            print("Students:")
-            print("{:<15}{:<25}{:<10}{:<15}{:<20}{:<15}".format("Student ID", "Name", "Gender", "Year Level", "Course Code", "Course Name"))
-            print("_________________________________________________________________________________________________________________")
-            for student in self.students:
-                self.cursor.execute("SELECT course_name FROM courses WHERE course_code=%s", (student[4],))
-                course_name = self.cursor.fetchone()
-                if course_name:
-                    print("{:<15}{:<25}{:<10}{:<15}{:<20}{:<15}".format(student[0], student[1], student[2], student[3], student[4], student[5]))
-        print()
+            return
+        print("{:<15}{:<25}{:<10}{:<15}{:<20}{:<15}".format("Student ID", "Name", "Gender", "Year Level", "Course Code", "Course Name"))
+        print("_________________________________________________________________________________________________________________")
+        for student in students:
+            course_code = student[4] if student[4] else ""  # Check if course code exists, otherwise set to empty string
+            course_name = student[5] if student[5] else ""  # Check if course name exists, otherwise set to empty string
+            print("{:<15}{:<25}{:<10}{:<15}{:<20}{:<15}".format(student[0], student[1], student[2], student[3], course_code, course_name))
 
-    def search(self, student_id):
+    def search_by_id(self, student_id):
         self.cursor.execute("SELECT * FROM students WHERE student_id = %s", (student_id,))
         result = self.cursor.fetchone()
         if result:
@@ -183,6 +195,7 @@ class Student:
                 print("2. Delete Student")
                 print("3. Edit Student")
                 print("4. Display Students")
+                print("5. Search Students")
                 print("0. Exit")
 
                 choice = input("Enter Your Choice: ")
@@ -201,8 +214,36 @@ class Student:
                     self.edit(student_id)
                     print()
                 elif choice == '4':
+                    # Disconnect from the database
+                    self.cursor.close()
+                    self.db.close()
+
+                    # Reconnect to the database
+                    self.db = mysql.connector.connect(
+                        host="localhost",
+                        user="root",
+                        password="nawawi",
+                        database="ssis_db"
+                    )
+                    self.cursor = self.db.cursor()
                     self.display_list()
-                elif choice == '0':
+                    print()
+                elif choice == '5':
+                    student_id = input("Enter Student ID to Search: ")
+                    self.search_by_id(student_id)
+                elif choice == '0': 
+                    # Disconnect from the database
+                    self.cursor.close()
+                    self.db.close()
+
+                    # Reconnect to the database
+                    self.db = mysql.connector.connect(
+                        host="localhost",
+                        user="root",
+                        password="nawawi",
+                        database="ssis_db"
+                    )
+                    self.cursor = self.db.cursor()
                     break
                 else:
                     print("Invalid choice. Please try again.\n")
@@ -226,11 +267,13 @@ class Course:
 
     def save_to_db(self):
         self.cursor.execute("TRUNCATE TABLE courses")
-        sql = "INSERT INTO courses (course_code, course_name) VALUES (%s, %s)"
-        course_data = [(course[0], course[1]) for course in self.courses]
-        self.cursor.executemany(sql, course_data)
+        if self.courses:
+            sql = "INSERT INTO courses (course_code, course_name) VALUES (%s, %s)"
+            course_data = [(course[0], course[1]) for course in self.courses]
+            self.cursor.executemany(sql, course_data)
         self.db.commit()
         print("Course data saved successfully to the database.")
+
 
     def add(self):
         course_code = input("Enter Course Code: ")
@@ -240,13 +283,25 @@ class Course:
         self.save_to_db()
 
     def delete(self, course_code):
+        deleted_course = None
         for course in self.courses:
             if course[0] == course_code:
-                self.courses.remove(course)
-                self.save_to_db()
-                print("Course deleted successfully.")
-                return
-        print("Course not found.")
+                deleted_course = course
+                break
+
+        if deleted_course:
+            self.courses.remove(deleted_course)
+            self.save_to_db()
+            self.update_student_course_code(course_code)
+            print("Course deleted successfully.")
+        else:
+            print("Course not found.")
+
+    def update_student_course_code(self, course_code):
+        self.cursor.execute("UPDATE students SET course_code = NULL, course_name = NULL WHERE course_code = %s", (course_code,))
+        self.db.commit()
+        print("Updated course code and course name in students table.")
+
 
     def edit(self, course_code):
         for i, course in enumerate(self.courses):
@@ -305,8 +360,21 @@ class Course:
                 print()
             elif choice == '4':
                 self.display_list()
-            elif choice == '0':
+            elif choice == '0': 
+                # Disconnect from the database
+                self.cursor.close()
+                self.db.close()
+
+                # Reconnect to the database
+                self.db = mysql.connector.connect(
+                    host="localhost",
+                    user="root",
+                    password="nawawi",
+                    database="ssis_db"
+                )
+                self.cursor = self.db.cursor()
                 break
+
             else:
                 print("Invalid choice. Please try again.\n")
 
@@ -331,8 +399,6 @@ def main_menu():
         elif choice == '2':
             course_menu.menu()
         elif choice == '0':
-            student_menu.save_to_db()
-            course_menu.save_to_db()
             break
         else:
             print("Invalid choice. Please try again.\n")
