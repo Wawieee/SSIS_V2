@@ -51,7 +51,7 @@ def course_menu():
         print("4. List Courses")
         print("5. Search Course")
         print("0. Exit")
-        choice = input("Enter your choice (0-5): ")
+        choice = input("Enter your choice: ")
 
         if choice == '1':
             add_course()
@@ -90,13 +90,17 @@ def add_student():
 
     course_code = input("Course Code: ")
 
-    cursor.execute('''
-        INSERT INTO students (student_id, name, gender, year_level, course_code)
-        VALUES (%s, %s, %s, %s, %s)
-    ''', (student_id, name, gender, year_level, course_code))
-    conn.commit()
-    print("\nStudent created successfully!")
+    try:
+        cursor.execute('''
+            INSERT INTO students (student_id, name, gender, year_level, course_code)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (student_id, name, gender, year_level, course_code))
+        conn.commit()
+        print("\nStudent created successfully!")
+    except mysql.connector.IntegrityError as e:
+        print("\nError: Duplicate primary key. The student ID already exists.")
     prompt()
+
 
 # Student Delete Function
 def delete_student():
@@ -197,13 +201,17 @@ def add_course():
     course_code = input("Course Code: ")
     course_name = input("Course Name: ")
 
-    cursor.execute('''
-        INSERT INTO courses (course_code, course_name)
-        VALUES (%s, %s)
-    ''', (course_code, course_name))
-    conn.commit()
-    print("\nCourse created successfully!")
+    try:
+        cursor.execute('''
+            INSERT INTO courses (course_code, course_name)
+            VALUES (%s, %s)
+        ''', (course_code, course_name))
+        conn.commit()
+        print("\nCourse created successfully!")
+    except mysql.connector.IntegrityError as e:
+        print("\nError: Duplicate primary key. The course code already exists.")
     prompt()
+
 
 # Course Delete Function
 def delete_course():
@@ -276,7 +284,7 @@ def search_course():
     prompt()
 
 def prompt():
-    input("\nPress Enter to continue...")
+    input("\n(Press ENTER to proceed)")
 
 # Main program
 def main():
